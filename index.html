@@ -1,0 +1,386 @@
+<!DOCTYPE HTML>
+<!--
+Programmation d'animation pour le Web 2
+Oudayan Dutta
+Groupe 15612
+TP1 - Jeu Ballbasket
+-->
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="Oudayan Dutta">
+        <title>Ball Basket</title>
+        <style>
+            body {
+                text-align: center;
+            }
+            #frame {
+                display: flex;
+                flex-direction: column;
+                position: relative;
+                top: 50px;
+                width: 834px;
+                background: grey;
+                margin: auto;
+                margin-top: auto; 
+                border: 2px solid #000000;
+            }
+            #myCanvas {
+                border: 7px solid #000000;
+                margin: 10px;
+            }
+            #myButton {
+                font: bold 2em Arial, serif;
+                padding: 0.5em;
+                display: none;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Ballbasket</h1>
+        <h2>Move the basket with the keyboard arrows to catch the balls!</h2>
+        <div id="frame">
+            <canvas id="myCanvas" width="800" height="400"></canvas>
+            <button id="myButton" onclick='restart()'>Try again</button>
+        </div>
+        <script src="js/Ball.js"></script>
+        <script src="js/Basket.js"></script>
+        <script src="js/Guide.js"></script>
+
+        <script>
+            var canvas=document.getElementById("myCanvas");
+            var context=canvas.getContext("2d");
+
+            // Background
+            var imageBg = new Image();
+            imageBg.src="images/basketball-court.jpg";
+
+            // Lives, score & level
+            var lives = 3;
+            var score = 0;
+            var level = 1;
+
+            // Ball & Guide
+            var imageBall = new Image();
+            imageBall.src = "images/basketball.png";
+            // Un ballon rajouté à tous les 10 niveaux (500 points)
+            var nbBalls = Math.ceil(level/10);
+            // Compteur du nombre total de lancés de ballons
+            var nbShots = 0;
+            // Tableaux contenant les instances actives de ballons, guides et cibles
+            var balls = [];
+            var guides = [];
+            var targets = [];
+            // Tableau qui garde si la cible est atteinte (true) ou ratée (false)
+            var hitTargets = [];
+            // Générer ballons, guides et cibles
+            for (var i=0; i<nbBalls; i++) {
+                nbShots++;
+                var x = random(0, canvas.width);
+                var y = canvas.height/4;
+                var r = 7;
+                var v = 500;
+                var rad = random(0, Math.PI*2);
+                var radSpeed = random(-Math.PI/15, Math.PI/15);
+                var scale = 0.1;
+                var distance = random(canvas.height/2, canvas.height);
+                var scaleDistance = 0.1 + 0.9 / canvas.height * distance;
+                var alphaG = 100;
+                var color = "hsla(56, 100%, 93%, " + (alphaG/100) + ")";
+                var alphaT = 100;
+                var targetColor = "hsla(120, 100%, 50%, " + (alphaT/100) + ")";
+                // Guide(x, y, r, scale, alpha, color, context)
+                guide = new Guide(x, distance, r, scaleDistance, alphaG/100, color, context);
+                guides.push(guide);
+                // Guide(x, y, r, scale, alpha, color, context)
+                target = new Guide(x, distance, r, scaleDistance, alphaT/100, targetColor, context);
+                targets.push(target);
+                // Ball(x, y, v, image, rad, radSpeed, scale, distance, context)
+                ball = new Ball(x, y, v, imageBall, rad, radSpeed, scale, distance, context);
+                balls.push(ball);
+            }
+
+            // Basket
+            var baskets=[];
+            var imageBasket = new Image();
+            imageBasket.src = "images/basket.png";
+            // Basket(x, y, v, image, scale, canvas, context)
+            var basket = new Basket(canvas.width*0.5, canvas.height*1.1, 500, imageBasket, 1, canvas, context);
+            baskets.push(basket);
+
+            // Controls basket
+            var keysDown={};   // Objet JS contenant les touches appuyées
+            addEventListener("keydown", record);   // Surveiller touches appuyées
+
+            function record(event) {
+                // console.log(event.keyCode);
+                keysDown[event.keyCode] = true;
+                // console.log(keysDown);
+            }
+
+            addEventListener("keyup", erase);
+
+            function erase(event) {
+                delete keysDown[event.keyCode];
+                // console.log(keysDown);
+            }
+
+            // Function random
+            function random(min, max) {
+                var num = Math.random()*(max-min) + min;
+                return num;
+            }
+
+            var t1 = Date.now();
+            window.onload = function() {
+                function animate() {
+                    context.clearRect(0, 0, canvas.width, canvas.height);
+                    display();
+                    var t2 = Date.now();
+                    var t = (t2-t1)/1000 + score/10000;
+                    increment(t);
+                    t1 = Date.now();
+                    requestAnimationFrame(animate);
+                }
+                var game = requestAnimationFrame(animate);
+
+                function display() {
+                    // Afficher le fond d'écran (court basket)
+                    context.drawImage(imageBg, 0, 0);
+                    // boucle des instances de ballons (tableau balls)
+                    for (var i=0; i<balls.length; i++) {
+                        // Afficher les guides fixes (niveau 1)
+                        if (level==1) {
+                            guides[i].display();
+                        }
+                        // Afficher les guides fade-out (niveau 2)
+                        else if (level==2) {
+                            guides[i].r+=0.1;
+                            if (alphaG>0) {
+                                alphaG--;
+                            }
+                            if (guides[i].alpha>0) {
+                                guides[i].alpha-=0.01;
+                            }
+                            guides[i].display();
+                        }
+                        // Afficher les guides fade-out rapides (niveau 3)
+                        else if (level==3) {
+                            guides[i].r+=0.1;
+                            if (alphaG>0) {
+                                alphaG-=5;
+                            }
+                            if (guides[i].alpha>0) {
+                                guides[i].alpha-=0.05;
+                            }
+                            guides[i].display();
+                        }
+                        // Niveaux 4 et plus n'ont pas de guides
+                        
+                        // Mettre à jour la transparence de la couleur du guide
+                        color = "hsla(56, 100%, 93%, " + (alphaG/100) + ")";
+                        guides[i].color = color;
+                        
+                        // Afficher le ballon
+                        balls[i].display();
+                    }
+                    
+                    // Afficher le panier
+                    baskets[0].display();
+                    
+                    // Mettre à jour les vies, niveau et pointage
+                    updateLives();
+                    updateLevel();
+                    updateScore();
+                    
+                    // Si aucune vies restantes, afficher game over et arrêter l'animation
+                    if (lives<=0) {
+                        gameOver();
+                        cancelAnimationFrame(game);
+                    }
+                }
+
+                function increment(t) {
+                    for (var i=0; i<balls.length; i++) {
+                        // Convertir la distance totale de la balle en valeur scale (de 0.1 à 1.0)
+                        var TotalDistScale = 0.1 + 0.9 / canvas.height * balls[i].distance;
+                        // Calculer la distance parcourue jusqu'ici par la balle (en pourcentage de la distance totale, de 0.00 à 1.00)
+                        var CurrentDistScale = (balls[i].scale - 0.1) / (TotalDistScale - 0.1);
+                        // Parcours d'arche 3D du ballon
+                        if (CurrentDistScale<0.05) { balls[i].y-=balls[i].v*t*0.125; }
+                        else if (CurrentDistScale<0.10) { balls[i].y-=balls[i].v*t*0.100; }
+                        else if (CurrentDistScale<0.15) { balls[i].y-=balls[i].v*t*0.075; }
+                        else if (CurrentDistScale<0.20) { balls[i].y-=balls[i].v*t*0.050; }
+                        else if (CurrentDistScale<0.25) { balls[i].y-=balls[i].v*t*0.025; }
+                        else if (CurrentDistScale<0.30) { balls[i].y+=balls[i].v*t*0.000; }
+                        else if (CurrentDistScale<0.35) { balls[i].y+=balls[i].v*t*0.125; }
+                        else if (CurrentDistScale<0.40) { balls[i].y+=balls[i].v*t*0.250; }
+                        else if (CurrentDistScale<0.45) { balls[i].y+=balls[i].v*t*0.500; }
+                        else if (CurrentDistScale<0.50) { balls[i].y+=balls[i].v*t*0.750; }
+                        else if (CurrentDistScale<0.55) { balls[i].y+=balls[i].v*t*1.000; }
+                        else if (CurrentDistScale<0.60) { balls[i].y+=balls[i].v*t*1.250; }
+                        else if (CurrentDistScale<0.65) { balls[i].y+=balls[i].v*t*1.500; }
+                        else if (CurrentDistScale<0.70) { balls[i].y+=balls[i].v*t*1.750; }
+                        else if (CurrentDistScale<0.75) { balls[i].y+=balls[i].v*t*2.000; }
+                        else if (CurrentDistScale<0.80) { balls[i].y+=balls[i].v*t*2.250; }
+                        else if (CurrentDistScale<0.85) { balls[i].y+=balls[i].v*t*2.500; }
+                        else if (CurrentDistScale<0.90) { balls[i].y+=balls[i].v*t*2.750; }
+                        else if (CurrentDistScale<0.95) { balls[i].y+=balls[i].v*t*3.000; }                  
+                        // Rotation du ballon
+                        balls[i].rad+=balls[i].radSpeed;
+                        // Agrandissement du ballon
+                        balls[i].scale+=0.9/canvas.height;
+
+                        // Croisement de ballon, panier et guide
+                        if (balls[i].x == guides[i].x && balls[i].y >= guides[i].y) {
+                            if ((Math.abs(baskets[0].x - balls[i].x) < baskets[0].image.width*guides[i].scale/3 + balls[i].image.width*guides[i].scale/3) && (Math.abs(baskets[0].y - balls[i].y) < baskets[0].image.height*guides[i].scale/3 + balls[i].image.height*guides[i].scale/3)) {
+                                // Incrémenter le score
+                                score+=2;
+                                // Incrémenter le niveau à tous les 50 points
+                                if (score%50==0) {
+                                    level++;
+                                }
+                                updateScore();
+                                updateLevel();
+                                // Effacer la dernière cible et en générer une nouvelle
+                                targets.splice(i, 1);
+                                alphaT = 100;
+                                // Flag pour cible atteinte
+                                hitTargets[i] = true;
+                                // Guide(x, y, r, scale, alpha, color, context)
+                                target = new Guide(x, distance, r, scaleDistance, alphaT/100, "hsla(120, 100%, 50%, " + (alphaT/100) + ")", context);
+                                targets.push(target);
+                            }
+                            else {
+                                lives--;
+                                updateLives();
+                                // Effacer la dernière cible et en générer une nouvelle
+                                targets.splice(i, 1);
+                                alphaT = 100;
+                                // Flag pour cible ratée
+                                hitTargets[i] = false;
+                                // Guide(x, y, r, scale, alpha, color, context)
+                                target = new Guide(x, distance, r, scaleDistance, alphaT/100, "hsla(0, 100%, 50%, " + (alphaT/100) + ")", context);
+                                targets.push(target);
+                            }
+                        }
+                        
+                        if (nbShots>1) {
+                            // Incrémenter le rayon du Target
+                            targets[i].r+=0.1;
+                            // Décrémenter la transparence
+                            if (alphaT>0) {
+                                alphaT--;
+                            }
+                            if (targets[i].alpha>0) {
+                                targets[i].alpha-=0.01;
+                            }
+                            // Mettre à jour la couleur et transparence de la cible
+                            if (hitTargets[i] == true) {
+                                // Cible atteinte = verte
+                                targetColor = "hsla(120, 100%, 50%, " + (alphaT/100) + ")";
+                            }
+                            else {
+                                // Cible ratée = rouge
+                                targetColor = "hsla(0, 100%, 50%, " + (alphaT/100) + ")";
+                            }
+                            targets[i].color = targetColor;
+                            console.log(alphaT, targetColor, targets[i].alpha);
+                            
+                            // Afficher la cible
+                            targets[i].display();
+                        }
+                        
+                        // une fois que le ballon a atteint sa distance finale
+                        if (balls[i].y>balls[i].distance) {
+                            // Enlever instances des tableaux balls et guides
+                            balls.splice(i, 1);     
+                            guides.splice(i, 1);
+                            // Si il reste de vies, générer de nouvelles instances de Ball, Guide et Target 
+                            if (lives>0) {
+                                // Générer nouvelles instances Ball et Guide
+                                nbShots++;
+                                x = random(0, canvas.width);
+                                y = canvas.height/4;
+                                r = 7;
+                                v = 500;
+                                rad = random(0, Math.PI*2);
+                                radSpeed = random(-Math.PI/15, Math.PI/15);
+                                scale = 0.1;
+                                distance = random(canvas.height/2, canvas.height);
+                                scaleDistance = 0.1 + 0.9 / canvas.height * distance;
+                                alphaG = 100;
+                                color = "hsla(56, 100%, 93%, " + (alphaG/100) + ")";
+                                 // Guide(x, y, r, scale, alpha, color, context)
+                                guide = new Guide(x, distance, r, scaleDistance, alphaG/100, color, context);
+                                guides.push(guide);
+                                // Ball(x, y, v, image, rad, radSpeed, scale, distance, context)
+                                ball = new Ball(x, y, v, imageBall, rad, radSpeed, scale, distance, context);
+                                balls.push(ball);
+                            }
+                        }
+                            
+                    }
+                    // Mouvement du panier
+                    if (37 in keysDown) {   // Flèche gauche
+                        baskets[0].left(t);
+                    }
+                    if (39 in keysDown) {   // Flèche droite
+                        baskets[0].right(t);
+                    }
+                    if (38 in keysDown) {   // Flèche haut
+                        baskets[0].up(t);
+                    }
+                    if (40 in keysDown) {   // Flèche bas
+                        baskets[0].down(t);
+                    }
+                }
+            }
+
+            // Fonction pour afficher le nombre de vies restantes
+            function updateLives() {
+                context.textAlign = 'left';
+                context.font = "bold 16pt Arial";
+                context.fillStyle="#fffddd";
+                context.textBaseline="top";
+                context.fillText("Lives : " + lives, 20, 25);
+            }
+
+            // Fonction pour afficher le niveau
+            function updateLevel() {
+                context.textAlign = 'center';
+                context.font = "bold 16pt Arial";
+                context.fillStyle="#fffddd";
+                context.textBaseline="top";
+                context.fillText("Level : " + level, canvas.width/2, 25);
+            }
+
+            // Fonction pour afficher le score
+            function updateScore() {
+                context.textAlign = 'right';
+                context.font = "bold 16pt Arial";
+                context.fillStyle="#fffddd";
+                context.textBaseline="top";
+                context.fillText("Score : " + score, canvas.width-20, 25);
+            }
+
+            // Fonction pour afficher GAME OVER
+            function gameOver() {
+                context.textAlign = "center";
+                context.font = "bold 40pt Arial";
+                context.fillStyle="#fffddd";
+                context.textBaseline="bottom";
+                context.fillText("GAME OVER", canvas.width/2, canvas.height/2);
+                document.getElementById('myButton').style.display = 'block';
+            }
+            
+            // Fonction pour rafraîchir la page et recommencer le jeu
+            function restart() {
+                location.reload();
+            }
+
+        </script>
+
+    </body>
+</html>
